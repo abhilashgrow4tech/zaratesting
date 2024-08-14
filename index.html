@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Authentication</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
+</head>
+<body>
+    <script type="module"></script>
+    <h2>Phone Authentication</h2>
+    <div>
+        <input type="text" id="phoneNumber" placeholder="Enter phone number" />
+        <button id="sendOtp">Send OTP</button>
+    </div>
+    <div id="otpSection" style="display:none;">
+        <input type="text" id="otpCode" placeholder="Enter OTP" />
+        <button id="verifyOtp">Verify OTP</button>
+    </div>
+    <div id="recaptcha-container"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyB--y-PQQXPGbwbXpD17DG6GKBjG49eQnw",
+  authDomain: "zaratesting-9673b.firebaseapp.com",
+  projectId: "zaratesting-9673b",
+  storageBucket: "zaratesting-9673b.appspot.com",
+  messagingSenderId: "773130906750",
+  appId: "1:773130906750:web:ec1b2222736d7d00e7fc2f",
+  measurementId: "G-Z1LTC17S1Z"
+};
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Setting up reCAPTCHA verifier
+        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+            'size': 'invisible',
+            'callback': function(response) {
+                console.log('reCAPTCHA solved, allowing OTP request...');
+            }
+        });
+
+        // Send OTP
+        document.getElementById('sendOtp').addEventListener('click', function() {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const appVerifier = window.recaptchaVerifier;
+
+            auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+                .then(function(confirmationResult) {
+                    window.confirmationResult = confirmationResult;
+                    document.getElementById('otpSection').style.display = 'block';
+                    alert('OTP sent!');
+                }).catch(function(error) {
+                    console.error("Error during OTP sending:", error);
+                    alert('Error sending OTP: ' + error.message);
+                });
+        });
+
+        // Verify OTP
+        document.getElementById('verifyOtp').addEventListener('click', function() {
+            const otpCode = document.getElementById('otpCode').value;
+
+            window.confirmationResult.confirm(otpCode)
+                .then(function(result) {
+                    const user = result.user;
+
+                    // Get the ID token and send it to the backend
+                    user.getIdToken().then(function(idToken) {
+                        // Send ID token and user info to backend
+                        fetch('http://localhost:3000/auth/verify-token', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                idToken: idToken,
+                                userInfo: {
+                                    firstName: "John",
+                                    lastName: "Doe",
+                                    email: "john.doe@example.com",
+                                    address: {
+                                        address1: "123 Main St",
+                                        city: "Anytown",
+                                        province: "State",
+                                        country: "Country",
+                                        zip: "12345"
+                                    }
+                                }
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('User registered/login successful:', data);
+                            alert('User registered/login successful!');
+                        })
+                        .catch(error => {
+                            console.error('Error during backend request:', error);
+                            alert('Error during backend request: ' + error.message);
+                        });
+                    });
+                }).catch(function(error) {
+                    console.error("Error during OTP verification:", error);
+                    alert('Error verifying OTP: ' + error.message);
+                });
+        });
+    </script>
+</body>
+</html>
